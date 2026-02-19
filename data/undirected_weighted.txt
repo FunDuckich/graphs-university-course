@@ -1,0 +1,10 @@
+0
+1
+Alpha | Beta 5.0, Gamma 2.5
+Beta | Alpha 5.0, Delta 10, Epsilon 1
+Gamma | Alpha 2.5, Zeta 4.2
+Delta | Beta 10, Eta 3
+Epsilon | Beta 1, Eta 8.5
+Zeta | Gamma 4.2, Eta 1.1
+Eta | Delta 3, Epsilon 8.5, Zeta 1.1, Eta 0.5
+Theta

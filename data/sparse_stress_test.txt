@@ -1,0 +1,14 @@
+1
+0
+Node1 | Node2
+Node2 | Node3
+Node3 | Node4
+Node4 | Node5
+Node5 | Node6
+Node6 | Node7
+Node7 | Node1
+Isolated_1
+Isolated_2
+Isolated_3
+Sink_Node |
+Source_Node | Node1, Isolated_1, Sink_Node
