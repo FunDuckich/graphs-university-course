@@ -31,6 +31,8 @@ class GraphManager:
                     self._create_graph(cmd[1:])
                 elif cmd[0] == "load":
                     self._load_graph(cmd[1:])
+                elif cmd[0] == "save":
+                    self._save_graph(cmd[1:])
                 elif cmd[0] == "copy":
                     self._copy_graph(cmd[1:])
                 elif cmd[0] == "switch":
@@ -47,6 +49,10 @@ class GraphManager:
                     self._show_edges()
                 elif cmd[0] == "show":
                     self._show_current()
+                elif cmd[0] == "task1":
+                    self._task1_out_greater_in()
+                elif cmd[0] == "task2":
+                    self._task2_non_adjacent(cmd[1:])
                 else:
                     print("Неизвестная команда. Введите 'help'.")
             except Exception as e:
@@ -57,6 +63,7 @@ class GraphManager:
                 Команды:
                   create <name> <dir:0/1> <weight:0/1> - новый граф
                   load <name> <filename>              - загрузить из файла
+                  save <filename>                     - сохранить граф в файл
                   copy <new_name>                     - клонировать текущий граф
                   list                                - список всех графов в памяти
                   switch <name>                       - переключиться на граф
@@ -66,6 +73,8 @@ class GraphManager:
                   add_e <u> <v> [w]                   - добавить ребро
                   del_v <v>                           - удалить вершину
                   del_e <u> <v>                       - удалить ребро
+                  task1                               - вершины, где исходов > заходов
+                  task2 <v>                           - вершины орграфа, не смежные с <v>
                   exit                                - выход
         """)
 
@@ -107,6 +116,21 @@ class GraphManager:
         self.current_key = name
         print(f"Граф '{name}' загружен из {path}.")
 
+    def _save_graph(self, args):
+        if not self.current:
+            print("Сначала выберите или создайте граф.")
+            return
+        if not args:
+            print("Укажите имя файла. Пример: save my_graph.txt")
+            return
+
+        path = args[0]
+        try:
+            self.current.save_to_file(path)
+            print(f"Граф '{self.current_key}' успешно сохранен в файл {path}.")
+        except Exception as e:
+            print(f"Ошибка при сохранении: {e}")
+
     def _switch_graph(self, args):
         if args[0] in self.graphs:
             self.current_key = args[0]
@@ -140,6 +164,43 @@ class GraphManager:
             print(self.current)
         else:
             print("Сначала выберите или создайте граф.")
+
+    def _task1_out_greater_in(self):
+        if not self.current:
+            print("Сначала выберите или создайте граф.")
+            return
+
+        vertices = self.current.get_out_greater_in_vertices()
+
+        if vertices:
+            print(f"Вершины, у которых полустепень исхода > полустепени захода: {', '.join(vertices)}")
+        else:
+            print("Таких вершин нет (у всех полустепень исхода <= полустепени захода).")
+
+    def _task2_non_adjacent(self, args):
+        if not self.current:
+            print("Сначала выберите или создайте граф.")
+            return
+
+        if not args:
+            print("Укажите вершину. Пример: task2 A")
+            return
+
+        v = args[0]
+        try:
+            result = self.current.get_non_adjacent_vertices(v)
+
+            if result:
+                print(f"Вершины, не смежные с '{v}': {', '.join(result)}")
+            else:
+                print(f"Все остальные вершины графа смежны с '{v}'.")
+
+        except ValueError as ve:
+            print(f"Ошибка логики: {ve}")
+        except KeyError as ke:
+            print(f"Ошибка ввода: {ke}")
+        except Exception as e:
+            print(f"Неожиданная ошибка: {e}")
 
 
 if __name__ == "__main__":

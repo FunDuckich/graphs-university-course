@@ -33,18 +33,18 @@ class Graph:
         return "\n".join(lines)
 
     @classmethod
-    def from_copy(cls, other: 'Graph'):
+    def from_copy(cls, other: "Graph"):
         new = cls(directed=other.directed, weighted=other.weighted)
         new._adj = copy.deepcopy(other._adj)
         new._rev_adj = copy.deepcopy(other._rev_adj)
         return new
 
     @classmethod
-    def from_file(cls, filename: str) -> 'Graph':
+    def from_file(cls, filename: str) -> "Graph":
         if not os.path.exists(filename):
             raise FileNotFoundError(f"Файл {filename} не найден.")
 
-        with open(filename, 'r', encoding='utf-8') as f:
+        with open(filename, "r", encoding="utf-8") as f:
             lines = [line.strip() for line in f if line.strip()]
 
             if len(lines) < 2:
@@ -59,12 +59,12 @@ class Graph:
             graph = cls(directed=is_directed, weighted=is_weighted)
 
             for line_idx, line in enumerate(lines[2:], start=3):
-                if '|' not in line:
+                if "|" not in line:
                     u = line.strip()
                     graph.add_vertex(u)
                     continue
 
-                parts = line.split('|')
+                parts = line.split("|")
                 u = parts[0].strip()
                 graph.add_vertex(u)
 
@@ -72,7 +72,7 @@ class Graph:
                 if not raw_edges:
                     continue
 
-                edge_entries = [e.strip() for e in raw_edges.split(',') if e.strip()]
+                edge_entries = [e.strip() for e in raw_edges.split(",") if e.strip()]
 
                 for entry in edge_entries:
                     data = entry.split()
@@ -90,6 +90,24 @@ class Graph:
                         graph.add_edge(u, v)
 
             return graph
+
+    def save_to_file(self, filename: str):
+        with open(filename, "w", encoding="utf-8") as f:
+            f.write(f"{int(self.directed)}\n")
+            f.write(f"{int(self.weighted)}\n")
+
+            for u in sorted(self._adj.keys()):
+                edges = []
+                for v, weight in self._adj[u].items():
+                    if self.weighted:
+                        edges.append(f"{v} {weight}")
+                    else:
+                        edges.append(f"{v}")
+
+                if edges:
+                    f.write(f"{u} | {', '.join(edges)}\n")
+                else:
+                    f.write(f"{u}\n")
 
     def add_vertex(self, v):
         if v not in self._adj:
@@ -156,3 +174,41 @@ class Graph:
                 else:
                     edges.append((u, v))
         return edges
+
+    def get_out_greater_in_vertices(self):
+        """
+        Возвращает список вершин, у которых полустепень исхода
+        (исходящие рёбра) строго больше полустепени захода (входящие рёбра).
+        """
+        if not self.directed:
+            return []
+
+        result = []
+        for v in self._adj:
+            out_degree = len(self._adj[v])  # Полустепень исхода
+            in_degree = len(self._rev_adj[v])  # Полустепень захода
+
+            if out_degree > in_degree:
+                result.append(v)
+
+        return result
+
+    def get_non_adjacent_vertices(self, v):
+        """
+        Возвращает список вершин орграфа, не смежных с вершиной v.
+        Смежными считаются вершины, соединенные с v ребром в любом направлении.
+        """
+        if not self.directed:
+            raise ValueError("По условию задачи требуется орграф. Текущий граф неориентированный.")
+
+        if v not in self._adj:
+            raise KeyError(f"Вершина '{v}' не найдена в графе.")
+
+        adjacent = set(self._adj[v].keys()).union(set(self._rev_adj[v].keys()))
+
+        non_adjacent = []
+        for u in self._adj:
+            if u != v and u not in adjacent:
+                non_adjacent.append(u)
+
+        return non_adjacent
