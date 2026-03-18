@@ -16,7 +16,7 @@ class GraphManager:
         print("--- Graph CLI Manager ---")
         self._show_help()
         while True:
-            cmd = input(f"\n[{self.current_key or 'Нет графа'}] > ").strip().lower().split()
+            cmd = input(f"\n[{self.current_key or 'Нет графа'}] > ").strip().split()
             if not cmd:
                 continue
 
@@ -53,6 +53,8 @@ class GraphManager:
                     self._task1_out_greater_in()
                 elif cmd[0] == "task2":
                     self._task2_non_adjacent(cmd[1:])
+                elif cmd[0] == "sym_diff":
+                    self._symmetric_difference(cmd[1:])
                 else:
                     print("Неизвестная команда. Введите 'help'.")
             except Exception as e:
@@ -75,6 +77,7 @@ class GraphManager:
                   del_e <u> <v>                       - удалить ребро
                   task1                               - вершины, где исходов > заходов
                   task2 <v>                           - вершины орграфа, не смежные с <v>
+                  sym_diff <g1> <g2> <new_res>        - симметрическая разность
                   exit                                - выход
         """)
 
@@ -201,6 +204,25 @@ class GraphManager:
             print(f"Ошибка ввода: {ke}")
         except Exception as e:
             print(f"Неожиданная ошибка: {e}")
+
+    def _symmetric_difference(self, args):
+        if len(args) < 3:
+            print("Нужно 3 аргумента: имя1 имя2 имя_результата")
+            return
+
+        name1, name2, res_name = args[0], args[1], args[2]
+
+        if name1 not in self.graphs or name2 not in self.graphs:
+            print("Один из графов не найден.")
+            return
+
+        try:
+            g_res = Graph.symmetric_difference(self.graphs[name1], self.graphs[name2])
+            self.graphs[res_name] = g_res
+            self.current_key = res_name
+            print(f"Симметрическая разность '{name1}' и '{name2}' сохранена в '{res_name}'.")
+        except Exception as e:
+            print(f"Ошибка: {e}")
 
 
 if __name__ == "__main__":

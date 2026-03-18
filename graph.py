@@ -212,3 +212,34 @@ class Graph:
                 non_adjacent.append(u)
 
         return non_adjacent
+
+    @staticmethod
+    def symmetric_difference(g1: 'Graph', g2: 'Graph') -> 'Graph':
+        if g1.directed != g2.directed:
+            raise ValueError("Графы должны быть одного типа ориентированности.")
+
+        res = Graph(directed=g1.directed, weighted=g1.weighted or g2.weighted)
+
+        all_v = set(g1._adj.keys()) | set(g2._adj.keys())
+        for v in all_v:
+            res.add_vertex(v)
+
+        edges1 = g1.get_edge_list()
+        edges2 = g2.get_edge_list()
+
+        def has_edge(g, u, v):
+            return u in g._adj and v in g._adj[u]
+
+        for e in edges1:
+            u, v = e[0], e[1]
+            if not has_edge(g2, u, v):
+                w = e[2] if len(e) == 3 else None
+                res.add_edge(u, v, weight=w)
+
+        for e in edges2:
+            u, v = e[0], e[1]
+            if not has_edge(g1, u, v):
+                w = e[2] if len(e) == 3 else None
+                res.add_edge(u, v, weight=w)
+
+        return res
