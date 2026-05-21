@@ -307,6 +307,8 @@ class Graph:
             raise KeyError(f"вершина {target} не найдена в графе.")
         if self._has_negative_edges():
             raise ValueError("в графе есть рёбра отрицательного веса.")
+        if max_distance < 0:
+            raise ValueError("N не может быть отрицательным.")
 
         distances = {target: 0}
         heap = [(0, target)]
@@ -333,6 +335,10 @@ class Graph:
         for v in (u1, u2, target):
             if v not in self._adj:
                 raise KeyError(f"вершина {v} не найдена в графе.")
+        if u1 == u2:
+            raise ValueError("u1 и u2 должны быть разными вершинами.")
+        self._ensure_can_leave_vertex(u1, target)
+        self._ensure_can_leave_vertex(u2, target)
         if self._has_negative_cycle_bellman_ford():
             raise ValueError("в графе есть цикл отрицательного веса.")
 
@@ -348,6 +354,9 @@ class Graph:
         for v in (source, v1, v2):
             if v not in self._adj:
                 raise KeyError(f"вершина {v} не найдена в графе.")
+        if v1 == v2:
+            raise ValueError("v1 и v2 должны быть разными вершинами.")
+        self._ensure_can_leave_vertex(source, v1, v2)
 
         vertices = list(self._adj.keys())
         distances = {u: {v: float("inf") for v in vertices} for u in vertices}
@@ -406,6 +415,7 @@ class Graph:
             raise KeyError(f"вершина {sink} не найдена в графе.")
         if source == sink:
             raise ValueError("источник и сток должны быть разными вершинами.")
+        self._ensure_can_leave_vertex(source, sink)
 
         residual = {v: {} for v in self._adj}
         original_edges = []
@@ -572,6 +582,12 @@ class Graph:
         if weight is None:
             raise ValueError("у каждого ребра взвешенного графа должен быть вес.")
         return weight
+
+    def _ensure_can_leave_vertex(self, source, *targets):
+        if source in targets:
+            return
+        if not self._adj[source]:
+            raise ValueError(f"из вершины {source} нельзя выйти: у неё нет исходящих рёбер.")
 
     def get_out_greater_in_vertices(self):
         """

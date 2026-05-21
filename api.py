@@ -55,6 +55,7 @@ app.add_middleware(
 
 
 def payload_to_graph(data):
+    validate_graph_payload(data)
     graph = Graph(directed=data.directed, weighted=data.weighted)
     for vertex in data.vertices:
         graph.add_vertex(vertex)
@@ -105,7 +106,7 @@ def run_algorithm(graph, algorithm, params):
     if algorithm == "out_greater_in":
         return out_greater_in_visual(graph)
     if algorithm == "non_adjacent":
-        return non_adjacent_visual(graph, params.get("vertex", ""))
+        return non_adjacent_visual(graph, text_param(params, "vertex", "вершину"))
     if algorithm == "scc":
         return scc_visual(graph)
     if algorithm == "radius":
@@ -115,13 +116,32 @@ def run_algorithm(graph, algorithm, params):
     if algorithm == "within_n":
         if not graph.directed:
             raise ValueError("по условию задачи требуется орграф.")
-        return dijkstra_to_target_visual(graph, params.get("target", ""), number_param(params, "limit", "N"))
+        limit = number_param(params, "limit", "N")
+        if limit < 0:
+            raise ValueError("N не может быть отрицательным.")
+        return dijkstra_to_target_visual(graph, text_param(params, "target", "целевую вершину"), limit)
     if algorithm == "bf_paths":
-        return bellman_ford_visual(graph, params.get("u1", ""), params.get("u2", ""), params.get("target", ""))
+        u1 = text_param(params, "u1", "вершину u1")
+        u2 = text_param(params, "u2", "вершину u2")
+        target = text_param(params, "target", "целевую вершину")
+        if u1 == u2:
+            raise ValueError("u1 и u2 должны быть разными вершинами.")
+        ensure_can_leave_vertex(graph, u1, target)
+        ensure_can_leave_vertex(graph, u2, target)
+        return bellman_ford_visual(graph, u1, u2, target)
     if algorithm == "floyd_paths":
-        return floyd_visual(graph, params.get("source", ""), params.get("v1", ""), params.get("v2", ""))
+        source = text_param(params, "source", "исходную вершину")
+        v1 = text_param(params, "v1", "вершину v1")
+        v2 = text_param(params, "v2", "вершину v2")
+        if v1 == v2:
+            raise ValueError("v1 и v2 должны быть разными вершинами.")
+        ensure_can_leave_vertex(graph, source, v1, v2)
+        return floyd_visual(graph, source, v1, v2)
     if algorithm == "max_flow":
-        return max_flow_visual(graph, params.get("source", ""), params.get("sink", ""))
+        source = text_param(params, "source", "источник")
+        sink = text_param(params, "sink", "сток")
+        ensure_can_leave_vertex(graph, source, sink)
+        return max_flow_visual(graph, source, sink)
     raise ValueError("неизвестный алгоритм.")
 
 
@@ -131,8 +151,52 @@ def number_param(params, key, label):
         raise ValueError(f"укажите число {label}.")
     try:
         return float(value)
-    except ValueError:
+    except (TypeError, ValueError):
         raise ValueError(f"{label} должно быть числом.")
+
+
+def text_param(params, key, label):
+    value = params.get(key)
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"укажите {label}.")
+    return value.strip()
+
+
+def validate_graph_payload(data):
+    seen_vertices = set()
+    for vertex in data.vertices:
+        if not vertex.strip():
+            raise ValueError("имя вершины не может быть пустым.")
+        if vertex in seen_vertices:
+            raise ValueError(f"вершина {vertex} указана несколько раз.")
+        seen_vertices.add(vertex)
+
+    seen_edges = set()
+    for edge in data.edges:
+        source = edge.source.strip()
+        target = edge.target.strip()
+        if not source or not target:
+            raise ValueError("у каждого ребра должны быть две вершины.")
+        if source not in seen_vertices or target not in seen_vertices:
+            raise ValueError(f"ребро {source} -> {target} ссылается на вершину, которой нет в списке.")
+        edge_key = (source, target) if data.directed else tuple(sorted((source, target)))
+        if edge_key in seen_edges:
+            raise ValueError(f"ребро {source} {"->" if data.directed else "--"} {target} указано несколько раз.")
+        seen_edges.add(edge_key)
+        if data.weighted:
+            if edge.weight is None:
+                raise ValueError("у каждого ребра взвешенного графа должен быть вес.")
+            if not math.isfinite(edge.weight):
+                raise ValueError("вес ребра должен быть конечным числом.")
+
+
+def ensure_can_leave_vertex(graph, source, *targets):
+    if source not in graph._adj:
+        return
+    if source in targets:
+        return
+    if not graph._adj[source]:
+        raise ValueError(f"из вершины {source} нельзя выйти: у неё нет исходящих рёбер.")
 
 
 def make_json_safe(value):

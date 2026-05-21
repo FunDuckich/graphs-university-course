@@ -107,7 +107,13 @@ class GraphManager:
         if not self.current:
             print("нет активного графа для копирования.")
             return
+        if not args:
+            print("укажите имя копии. пример: copy graph_copy")
+            return
         new_name = args[0]
+        if new_name in self.graphs:
+            print(f"граф \"{new_name}\" уже существует.")
+            return
         self.graphs[new_name] = Graph.from_copy(self.current)
         print(f"граф \"{self.current_key}\" скопирован в \"{new_name}\".")
 
@@ -130,13 +136,34 @@ class GraphManager:
                 print(f"{edge[0]} {connector} {edge[1]}")
 
     def _create_graph(self, args):
-        name, d, w = args[0], int(args[1]), int(args[2])
+        if len(args) < 3:
+            print("укажите имя графа, ориентированность и взвешенность. пример: create g 1 0")
+            return
+        name = args[0]
+        try:
+            d = int(args[1])
+            w = int(args[2])
+        except ValueError:
+            print("флаги ориентированности и взвешенности должны быть 0 или 1.")
+            return
+        if name in self.graphs:
+            print(f"граф \"{name}\" уже существует.")
+            return
+        if d not in (0, 1) or w not in (0, 1):
+            print("флаги ориентированности и взвешенности должны быть 0 или 1.")
+            return
         self.graphs[name] = Graph(directed=bool(d), weighted=bool(w))
         self.current_key = name
         print(f"граф \"{name}\" создан.")
 
     def _load_graph(self, args):
+        if len(args) < 2:
+            print("укажите имя графа и файл. пример: load g data/directed_weighted.txt")
+            return
         name, path = args[0], args[1]
+        if name in self.graphs:
+            print(f"граф \"{name}\" уже существует.")
+            return
         self.graphs[name] = Graph.from_file(path)
         self.current_key = name
         print(f"граф \"{name}\" загружен из {path}.")
@@ -157,6 +184,9 @@ class GraphManager:
             print(f"ошибка при сохранении: {e}")
 
     def _switch_graph(self, args):
+        if not args:
+            print("укажите имя графа. пример: switch g")
+            return
         if args[0] in self.graphs:
             self.current_key = args[0]
             print(f"переключено на \"{args[0]}\".")
@@ -167,23 +197,69 @@ class GraphManager:
         print("графы в памяти:", ", ".join(self.graphs.keys()) or "пусто")
 
     def _add_vertex(self, args):
-        if self.current:
-            self.current.add_vertex(args[0])
+        if not self.current:
+            print("сначала выберите или создайте граф.")
+            return
+        if not args:
+            print("укажите вершину. пример: add_v A")
+            return
+        vertex = args[0]
+        if vertex in self.current._adj:
+            print(f"вершина \"{vertex}\" уже существует.")
+            return
+        self.current.add_vertex(vertex)
+        print(f"вершина \"{vertex}\" добавлена.")
 
     def _add_edge(self, args):
         if not self.current:
+            print("сначала выберите или создайте граф.")
+            return
+        if len(args) < 2:
+            print("укажите две вершины ребра. пример: add_e A B")
             return
         u, v = args[0], args[1]
-        w = float(args[2]) if len(args) > 2 and self.current.weighted else None
+        if v in self.current._adj.get(u, {}):
+            print(f"ребро ({u}, {v}) уже существует.")
+            return
+        if not self.current.directed and u in self.current._adj.get(v, {}):
+            print(f"ребро ({u}, {v}) уже существует.")
+            return
+        if self.current.weighted and len(args) < 3:
+            print("для взвешенного графа укажите вес. пример: add_e A B 3")
+            return
+        if not self.current.weighted and len(args) > 2:
+            print("для невзвешенного графа вес указывать не нужно.")
+            return
+        if self.current.weighted:
+            try:
+                w = float(args[2])
+            except ValueError:
+                print("вес должен быть числом.")
+                return
+        else:
+            w = None
         self.current.add_edge(u, v, weight=w)
+        print(f"ребро ({u}, {v}) добавлено.")
 
     def _del_vertex(self, args):
-        if self.current:
-            self.current.remove_vertex(args[0])
+        if not self.current:
+            print("сначала выберите или создайте граф.")
+            return
+        if not args:
+            print("укажите вершину. пример: del_v A")
+            return
+        self.current.remove_vertex(args[0])
+        print(f"вершина \"{args[0]}\" удалена.")
 
     def _del_edge(self, args):
-        if self.current:
-            self.current.remove_edge(args[0], args[1])
+        if not self.current:
+            print("сначала выберите или создайте граф.")
+            return
+        if len(args) < 2:
+            print("укажите две вершины ребра. пример: del_e A B")
+            return
+        self.current.remove_edge(args[0], args[1])
+        print(f"ребро ({args[0]}, {args[1]}) удалено.")
 
     def _show_current(self):
         if self.current:
@@ -281,7 +357,11 @@ class GraphManager:
             return
 
         target = args[0]
-        max_distance = float(args[1])
+        try:
+            max_distance = float(args[1])
+        except ValueError:
+            print("N должно быть числом.")
+            return
         vertices = self.current.get_vertices_with_distance_to_target_at_most_dijkstra(target, max_distance)
 
         if vertices:

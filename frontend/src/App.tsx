@@ -84,6 +84,34 @@ function normalizeWeight(value: string) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function algorithmValidationMessage(algorithm: string, params: Record<string, string>) {
+  const requiredFields = algorithms.find((item) => item.id === algorithm)?.fields ?? [];
+  for (const field of requiredFields) {
+    if (!(params[field] ?? "").trim()) {
+      return `укажите ${fieldLabels[field].toLowerCase()}.`;
+    }
+  }
+  if (algorithm === "within_n") {
+    const limit = Number(params.limit);
+    if (!Number.isFinite(limit)) {
+      return "N должно быть числом.";
+    }
+    if (limit < 0) {
+      return "N не может быть отрицательным.";
+    }
+  }
+  if (algorithm === "bf_paths" && params.u1.trim() === params.u2.trim()) {
+    return "u1 и u2 должны быть разными вершинами.";
+  }
+  if (algorithm === "floyd_paths" && params.v1.trim() === params.v2.trim()) {
+    return "v1 и v2 должны быть разными вершинами.";
+  }
+  if (algorithm === "max_flow" && params.source.trim() === params.sink.trim()) {
+    return "источник и сток должны быть разными вершинами.";
+  }
+  return "";
+}
+
 function resultText(value: unknown): string {
   return JSON.stringify(value, null, 2)
     .split("\"").join("")
@@ -106,6 +134,7 @@ export function App() {
   const [params, setParams] = useState<Record<string, string>>({ source: "S", sink: "T", target: "T", limit: "5", u1: "A", u2: "B", v1: "A", v2: "T", vertex: "A" });
   const [response, setResponse] = useState<AlgorithmResponse | null>(null);
   const [stepIndex, setStepIndex] = useState(0);
+  const [editorError, setEditorError] = useState("");
   const [error, setError] = useState("");
   const [playing, setPlaying] = useState(false);
 
@@ -260,23 +289,42 @@ export function App() {
 
   function addVertex() {
     const name = vertexName.trim();
-    if (!name || graph.vertices.includes(name)) {
+    if (!name) {
+      setEditorError("укажите имя вершины.");
+      return;
+    }
+    if (graph.vertices.includes(name)) {
+      setEditorError(`вершина "${name}" уже существует.`);
       return;
     }
     setGraph({ ...graph, vertices: [...graph.vertices, name] });
     setVertexName("");
+    setEditorError("");
   }
 
   function addEdge() {
-    if (!edgeSource || !edgeTarget) {
-      return;
-    }
     const source = edgeSource.trim();
     const target = edgeTarget.trim();
+    if (!source || !target) {
+      setEditorError("укажите обе вершины ребра.");
+      return;
+    }
+    const edgeExists = graph.edges.some((edge) =>
+      edge.source === source && edge.target === target
+      || !graph.directed && edge.source === target && edge.target === source
+    );
+    if (edgeExists) {
+      setEditorError(`ребро ${source} ${graph.directed ? "->" : "--"} ${target} уже существует.`);
+      return;
+    }
     const nextVertices = Array.from(new Set([...graph.vertices, source, target]));
     const weight = graph.weighted ? normalizeWeight(edgeWeight) : null;
-    const nextEdges = graph.edges.filter((edge) => edge.source !== source || edge.target !== target);
-    setGraph({ ...graph, vertices: nextVertices, edges: [...nextEdges, { source, target, weight }] });
+    if (graph.weighted && weight === null) {
+      setEditorError("укажите числовой вес ребра.");
+      return;
+    }
+    setGraph({ ...graph, vertices: nextVertices, edges: [...graph.edges, { source, target, weight }] });
+    setEditorError("");
   }
 
   function deleteVertex(vertex: string) {
@@ -285,6 +333,7 @@ export function App() {
       vertices: graph.vertices.filter((item) => item !== vertex),
       edges: graph.edges.filter((edge) => edge.source !== vertex && edge.target !== vertex)
     });
+    setEditorError("");
   }
 
   function deleteEdge(edgeToDelete: EdgeData) {
@@ -292,10 +341,12 @@ export function App() {
       ...graph,
       edges: graph.edges.filter((edge) => edge !== edgeToDelete)
     });
+    setEditorError("");
   }
 
   async function loadExample() {
     setError("");
+    setEditorError("");
     const responseData = await fetch(`/api/examples/${selectedExample}`);
     if (!responseData.ok) {
       setError("пример не загрузился");
@@ -310,6 +361,11 @@ export function App() {
   async function runAlgorithm() {
     setError("");
     setPlaying(false);
+    const validationMessage = algorithmValidationMessage(algorithm, params);
+    if (validationMessage) {
+      setError(validationMessage);
+      return;
+    }
     const selected = algorithms.find((item) => item.id === algorithm);
     const preparedParams: Record<string, string | number> = {};
     for (const field of selected?.fields ?? []) {
@@ -349,6 +405,7 @@ export function App() {
     setGraph(emptyGraph);
     setResponse(null);
     setStepIndex(0);
+    setEditorError("");
     setError("");
   }
 
@@ -380,7 +437,10 @@ export function App() {
           <section>
             <h2>вершины</h2>
             <div className="form-row">
-              <input value={vertexName} onChange={(event) => setVertexName(event.target.value)} placeholder="имя" />
+              <input value={vertexName} onChange={(event) => {
+                setVertexName(event.target.value);
+                setEditorError("");
+              }} placeholder="имя" />
               <button onClick={addVertex} title="добавить вершину"><CirclePlus size={18} /></button>
             </div>
             <div className="chips">
@@ -390,14 +450,24 @@ export function App() {
                 </button>
               ))}
             </div>
+            {editorError && <div className="error">{editorError}</div>}
           </section>
 
           <section>
             <h2>рёбра</h2>
             <div className="grid-form">
-              <input value={edgeSource} onChange={(event) => setEdgeSource(event.target.value)} placeholder="из" />
-              <input value={edgeTarget} onChange={(event) => setEdgeTarget(event.target.value)} placeholder="в" />
-              <input value={edgeWeight} onChange={(event) => setEdgeWeight(event.target.value)} placeholder="вес" disabled={!graph.weighted} />
+              <input value={edgeSource} onChange={(event) => {
+                setEdgeSource(event.target.value);
+                setEditorError("");
+              }} placeholder="из" />
+              <input value={edgeTarget} onChange={(event) => {
+                setEdgeTarget(event.target.value);
+                setEditorError("");
+              }} placeholder="в" />
+              <input value={edgeWeight} onChange={(event) => {
+                setEdgeWeight(event.target.value);
+                setEditorError("");
+              }} placeholder="вес" disabled={!graph.weighted} />
               <button onClick={addEdge} title="добавить ребро"><Save size={18} /></button>
             </div>
             <div className="edge-list">
@@ -422,14 +492,20 @@ export function App() {
         <aside className="panel right-panel">
           <section>
             <h2>алгоритм</h2>
-            <select value={algorithm} onChange={(event) => setAlgorithm(event.target.value)}>
+            <select value={algorithm} onChange={(event) => {
+              setAlgorithm(event.target.value);
+              setError("");
+            }}>
               {algorithms.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
             </select>
             <div className="params">
               {algorithms.find((item) => item.id === algorithm)?.fields.map((field) => (
                 <label key={field}>
                   {fieldLabels[field]}
-                  <input value={params[field] ?? ""} onChange={(event) => setParams({ ...params, [field]: event.target.value })} />
+                  <input value={params[field] ?? ""} onChange={(event) => {
+                    setParams({ ...params, [field]: event.target.value });
+                    setError("");
+                  }} />
                 </label>
               ))}
             </div>
